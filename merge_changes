@@ -1,0 +1,72 @@
+#! /usr/bin/env ruby
+
+# Usage:
+#   ./merge_changes file1.changes file2.changes file3.changes > combined.changes
+
+require 'date'
+
+class Changelog
+  def initialize(filename)
+    @filename = filename
+  end
+
+  def entries
+    @entries ||= generate_entries
+  end
+
+  private
+
+  SEPARATOR = ("-" * 67).freeze
+  private_constant :SEPARATOR
+
+  attr_reader :filename
+
+  def generate_entries
+    entries_text.map { |t| Entry.new(t) }
+  end
+
+  def entries_text
+    text = File.read(filename)
+    text.gsub(/----*\n*/, "__SEP__").split("__SEP__")[1..].map { |s| SEPARATOR + "\n" + s }
+  end
+
+  class Entry
+    include Comparable
+
+    def initialize(text)
+      @text = text
+    end
+
+    def <=>(other)
+      date <=> other.date
+    end
+
+    def to_s
+      text
+    end
+
+    protected
+
+    def date
+      @date ||= parse_date
+    end
+
+    private
+
+    attr_reader :text
+
+    def parse_date
+      date_text = text.split("\n")[1].split(" - ").first
+
+      DateTime.parse(date_text)
+    end
+  end
+end
+
+files = ARGV
+
+changelogs = files.map { |f| Changelog.new(f) }
+
+entries = changelogs.map { |c| c.entries }.flatten.sort.reverse
+
+puts entries.map(&:to_s).join
